@@ -1,33 +1,49 @@
 # Foxtrot HR — Recruiter Finder
 
-A vibrant, single-page tool for finding the right HR contact at any company.
-Type a company name, pick your track (Early Career or Executive), and get
-pre-built LinkedIn people-search links targeting the most relevant recruiters.
+A vibrant single-page tool that finds the **one** HR/recruiting person you
+should message on LinkedIn for any company. Type a company, pick a track
+(Early Career or Executive), and Foxtrot returns a single contact card with
+a name, title, direct LinkedIn link, reasoning, and confidence level.
 
-## Run it
+Under the hood it uses the Claude API with web search to identify a real,
+currently-employed person — no manual LinkedIn hunting required.
 
-No build step. Just open `index.html` in a browser, or serve the folder:
+## Setup
 
 ```bash
-python3 -m http.server 8000
-# then visit http://localhost:8000
+npm install
+cp .env.example .env
+# edit .env and set ANTHROPIC_API_KEY
 ```
 
-## Files
+## Run
 
-- `index.html` — markup
-- `styles.css` — glassmorphic, animated UI
-- `script.js` — builds LinkedIn search URLs per track
-- `assets/foxtrot-logo.svg` — brand mark
+```bash
+npm start
+# → http://localhost:3000
+```
+
+Then open the URL, type a company, and hit **Early Career** (green) or
+**Executive** (red).
 
 ## How it works
 
-Each track has a curated list of HR role keywords. On submit, the tool builds
-a LinkedIn people-search URL of the form:
+- `server.js` exposes `POST /api/find-recruiter` with `{company, track}`.
+- It calls `claude-opus-4-6` with:
+  - Adaptive thinking (`thinking: {type: 'adaptive'}`)
+  - High effort (`output_config.effort: 'high'`)
+  - Web search (`web_search_20260209`, up to 6 uses)
+  - A strict JSON schema via `output_config.format`
+- The model researches the web, picks **one** real person, and returns
+  `{name, title, linkedin_url, reasoning, confidence}`.
+- The frontend renders it as a single animated contact card.
 
-```
-https://www.linkedin.com/search/results/people/?keywords=<company>+<role-keywords>
-```
+## Files
 
-Early Career targets University / Campus / Early Talent recruiters.
-Executive targets Heads of Talent, VPs of People, and Chief People Officers.
+| File | Purpose |
+|---|---|
+| `server.js` | Express backend + Claude API integration |
+| `index.html` | Markup |
+| `styles.css` | Glassmorphic, animated UI |
+| `script.js` | Calls the backend, renders the contact card |
+| `assets/foxtrot-logo.svg` | Brand mark |

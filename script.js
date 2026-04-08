@@ -1,141 +1,177 @@
 /* ============================================================
-   Foxtrot HR — Recruiter Finder
-   Builds LinkedIn people-search URLs targeted at HR recruiters
+   Foxtrot HR — Recruiter Finder (frontend)
+   Calls the /api/find-recruiter backend which uses Claude +
+   web search to identify the single best HR contact.
    ============================================================ */
 
 const form = document.getElementById('search-form');
 const companyInput = document.getElementById('company');
 const resultsEl = document.getElementById('results');
+const trackButtons = document.querySelectorAll('.track-btn');
 
-/**
- * Role presets per track. Each entry becomes a LinkedIn people
- * search scoped to the company, using tailored keywords.
- */
-const TRACKS = {
-  early: {
-    label: 'Early Career',
-    blurb: 'University & campus hires · New-grad programs',
-    roles: [
-      {
-        role: 'University Recruiter',
-        desc: 'Owns campus pipelines and new-grad hiring',
-        keywords: '"University Recruiter"',
-      },
-      {
-        role: 'Campus Recruiter',
-        desc: 'On-campus events, interns, rotational programs',
-        keywords: '"Campus Recruiter"',
-      },
-      {
-        role: 'Early Career Talent Acquisition',
-        desc: 'Early-in-career, intern & new-grad specialist',
-        keywords: '"Early Career" AND ("Talent Acquisition" OR Recruiter)',
-      },
-      {
-        role: 'Early Talent Program Manager',
-        desc: 'Runs intern & new-grad rotational programs',
-        keywords: '"Early Talent" AND (Program OR Manager)',
-      },
-      {
-        role: 'Technical Recruiter (New Grad)',
-        desc: 'Tech new-grad & intern pipelines',
-        keywords: '"Technical Recruiter" AND ("New Grad" OR "Early Career" OR Intern)',
-      },
-    ],
-  },
-  executive: {
-    label: 'Executive',
-    blurb: 'Leadership, VP & C-suite search',
-    roles: [
-      {
-        role: 'Executive Recruiter',
-        desc: 'Director+ and leadership hiring',
-        keywords: '"Executive Recruiter"',
-      },
-      {
-        role: 'Head of Talent Acquisition',
-        desc: 'Owns the full TA org — ideal for senior asks',
-        keywords: '"Head of Talent Acquisition"',
-      },
-      {
-        role: 'Director of Talent Acquisition',
-        desc: 'Senior-level hiring leader',
-        keywords: '"Director of Talent Acquisition"',
-      },
-      {
-        role: 'VP of People / Talent',
-        desc: 'People org leadership, strategic hires',
-        keywords: '("VP People" OR "VP of Talent" OR "VP Talent Acquisition")',
-      },
-      {
-        role: 'Chief People Officer',
-        desc: 'Top of the HR function',
-        keywords: '"Chief People Officer"',
-      },
-    ],
-  },
+let pendingTrack = 'early';
+let inFlight = false;
+
+const TRACK_META = {
+  early: { label: 'Early Career', chipClass: 'early' },
+  executive: { label: 'Executive', chipClass: 'executive' },
 };
 
-/** Build a LinkedIn people-search URL scoped to a company + keywords. */
-function buildLinkedInURL(company, keywords) {
-  // Use LinkedIn's keyword-scoped people search.
-  // Format: keywords = "<Company> <role-keywords>"
-  const q = `${company} ${keywords}`.trim();
-  const encoded = encodeURIComponent(q);
-  return `https://www.linkedin.com/search/results/people/?keywords=${encoded}&origin=GLOBAL_SEARCH_HEADER`;
+trackButtons.forEach((btn) => {
+  btn.addEventListener('click', () => {
+    pendingTrack = btn.dataset.track;
+  });
+});
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (inFlight) return;
+
+  const company = companyInput.value.trim();
+  if (!company) {
+    shakeInput();
+    return;
+  }
+
+  setLoading(company, pendingTrack);
+  inFlight = true;
+  setFormDisabled(true);
+
+  try {
+    const resp = await fetch('/api/find-recruiter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ company, track: pendingTrack }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data.error || `Request failed (${resp.status})`);
+    }
+    renderPerson(data);
+  } catch (err) {
+    renderError(err.message || 'Something went wrong.');
+  } finally {
+    inFlight = false;
+    setFormDisabled(false);
+  }
+});
+
+function setFormDisabled(disabled) {
+  trackButtons.forEach((b) => {
+    b.disabled = disabled;
+    b.classList.toggle('is-loading', disabled);
+  });
+  companyInput.disabled = disabled;
 }
 
-/** Clear the results area with a quick fade. */
-function clearResults() {
-  resultsEl.innerHTML = '';
-}
-
-/** Render results for a given track + company. */
-function renderResults(trackKey, company) {
-  const track = TRACKS[trackKey];
-  if (!track) return;
-
-  clearResults();
-
-  const header = document.createElement('div');
-  header.className = 'result-header';
-  header.innerHTML = `
-    <span>Results for</span>
-    <span class="chip ${trackKey}">${track.label}</span>
-    <span style="color:var(--ink);font-weight:600;letter-spacing:0.02em;text-transform:none;">
-      ${escapeHTML(company)}
-    </span>
-  `;
-  resultsEl.appendChild(header);
-
-  track.roles.forEach((r) => {
-    const a = document.createElement('a');
-    a.className = 'result-link';
-    a.href = buildLinkedInURL(company, r.keywords);
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.innerHTML = `
-      <div class="li-icon">in</div>
-      <div class="meta">
-        <div class="role">${escapeHTML(r.role)}</div>
-        <div class="desc">${escapeHTML(r.desc)}</div>
+/** Loading state — skeleton card with shimmer. */
+function setLoading(company, track) {
+  const meta = TRACK_META[track];
+  resultsEl.innerHTML = `
+    <div class="result-header">
+      <span>Searching for</span>
+      <span class="chip ${meta.chipClass}">${meta.label}</span>
+      <span class="result-company">${escapeHTML(company)}</span>
+    </div>
+    <div class="contact-card skeleton">
+      <div class="sk-avatar"></div>
+      <div class="sk-lines">
+        <div class="sk-line sk-line-lg"></div>
+        <div class="sk-line sk-line-md"></div>
+        <div class="sk-line sk-line-sm"></div>
       </div>
-      <svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    </div>
+    <div class="loading-hint">
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="dot"></span>
+      <span class="loading-text">Foxtrot is researching the web for the perfect contact…</span>
+    </div>
+  `;
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/** Render the single recommended person. */
+function renderPerson(data) {
+  const {
+    name = 'Unknown',
+    title = '',
+    linkedin_url = '#',
+    reasoning = '',
+    confidence = 'medium',
+    company = '',
+    track = 'early',
+  } = data;
+
+  const meta = TRACK_META[track] || TRACK_META.early;
+  const initials = getInitials(name);
+
+  resultsEl.innerHTML = `
+    <div class="result-header">
+      <span>Your contact at</span>
+      <span class="result-company">${escapeHTML(company)}</span>
+      <span class="chip ${meta.chipClass}">${meta.label}</span>
+    </div>
+
+    <a class="contact-card" href="${escapeAttr(linkedin_url)}" target="_blank" rel="noopener noreferrer">
+      <div class="avatar">
+        <span class="avatar-initials">${escapeHTML(initials)}</span>
+        <div class="avatar-ring"></div>
+      </div>
+
+      <div class="contact-body">
+        <div class="contact-name">${escapeHTML(name)}</div>
+        <div class="contact-title">${escapeHTML(title)}</div>
+        <div class="contact-reason">${escapeHTML(reasoning)}</div>
+
+        <div class="contact-meta">
+          <span class="confidence conf-${escapeAttr(confidence)}">
+            <span class="conf-dot"></span>
+            ${escapeHTML(confidence)} confidence
+          </span>
+          <span class="linkedin-badge">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M20.5 2h-17A1.5 1.5 0 002 3.5v17A1.5 1.5 0 003.5 22h17a1.5 1.5 0 001.5-1.5v-17A1.5 1.5 0 0020.5 2zM8 19H5V9h3zM6.5 7.7a1.7 1.7 0 110-3.4 1.7 1.7 0 010 3.4zM19 19h-3v-5.3c0-1.3-.5-2.2-1.7-2.2a1.8 1.8 0 00-1.7 1.2 2.3 2.3 0 00-.1.8V19h-3V9h3v1.3a3 3 0 012.7-1.5c2 0 3.5 1.3 3.5 4.1z"/>
+            </svg>
+            Open in LinkedIn
+          </span>
+        </div>
+      </div>
+
+      <svg class="card-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M7 17L17 7M9 7h8v8"/>
       </svg>
-    `;
-    resultsEl.appendChild(a);
-  });
+    </a>
+  `;
 
-  // Smooth scroll into view on small screens
-  requestAnimationFrame(() => {
-    resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  });
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
-/** Minimal HTML escape for user-provided text. */
+function renderError(msg) {
+  resultsEl.innerHTML = `
+    <div class="error-card">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 8v5M12 16.5v.01"/>
+      </svg>
+      <div>
+        <div class="error-title">Couldn't fetch a contact</div>
+        <div class="error-msg">${escapeHTML(msg)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function getInitials(name) {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return '?';
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 function escapeHTML(s) {
-  return String(s)
+  return String(s ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -143,7 +179,10 @@ function escapeHTML(s) {
     .replace(/'/g, '&#39;');
 }
 
-/** Shake the input when empty. */
+function escapeAttr(s) {
+  return escapeHTML(s);
+}
+
 function shakeInput() {
   companyInput.animate(
     [
@@ -158,21 +197,3 @@ function shakeInput() {
   );
   companyInput.focus();
 }
-
-// Handle both buttons — whichever was clicked submits the form with its data-track
-let pendingTrack = 'early';
-document.querySelectorAll('.track-btn').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    pendingTrack = btn.dataset.track;
-  });
-});
-
-form.addEventListener('submit', (e) => {
-  e.preventDefault();
-  const company = companyInput.value.trim();
-  if (!company) {
-    shakeInput();
-    return;
-  }
-  renderResults(pendingTrack, company);
-});
