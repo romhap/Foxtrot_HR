@@ -6,7 +6,7 @@
    ============================================================ */
 
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.40.0';
-import OpenAI from 'https://esm.sh/openai@4.77.0';
+import OpenAI from 'https://esm.sh/openai@5';
 
 /* ---------- Storage keys ---------- */
 const STORAGE = {
@@ -337,6 +337,12 @@ async function callAnthropic(apiKey, userPrompt) {
 
 async function callOpenAI(apiKey, userPrompt) {
   const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+  if (!client.responses || typeof client.responses.create !== 'function') {
+    throw new Error(
+      'OpenAI SDK is missing the Responses API. Hard-refresh the page to pull the latest bundle.'
+    );
+  }
 
   const response = await client.responses.create({
     model: 'gpt-5',
