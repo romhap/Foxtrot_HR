@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Foxtrot HR — Recruiter Finder</title>
+  <link rel="icon" type="image/svg+xml" href="assets/foxtrot-logo.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <!-- Animated gradient background -->
+  <div class="bg-layer">
+    <div class="blob blob-1"></div>
+    <div class="blob blob-2"></div>
+    <div class="blob blob-3"></div>
+    <div class="grid-overlay"></div>
+  </div>
+
+  <main class="app">
+    <!-- Header / Branding -->
+    <header class="brand">
+      <div class="logo-wrap">
+        <img src="assets/foxtrot-logo.svg" alt="Foxtrot logo" class="logo" />
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-name">FOXTROT<span class="brand-dot">.</span></h1>
+        <p class="brand-tag">Recruiter Finder</p>
+      </div>
+    </header>
+
+    <!-- Main card -->
+    <section class="card">
+      <div class="card-header">
+        <h2 class="card-title">Find the right recruiter.</h2>
+        <p class="card-sub">Type a company, pick your track, and we'll surface the HR specialists you should reach out to on LinkedIn.</p>
+      </div>
+
+      <form id="search-form" class="search-form" autocomplete="off">
+        <div class="input-wrap">
+          <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 21h18"/>
+            <path d="M5 21V7l7-4 7 4v14"/>
+            <path d="M9 9h.01M9 13h.01M9 17h.01M15 9h.01M15 13h.01M15 17h.01"/>
+          </svg>
+          <input
+            id="company"
+            name="company"
+            type="text"
+            placeholder="e.g. Stripe, Anthropic, Airbnb…"
+            required
+            aria-label="Company name"
+          />
+        </div>
+
+        <div class="button-row">
+          <button type="submit" class="track-btn early" data-track="early">
+            <span class="btn-pulse"></span>
+            <span class="btn-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                <path d="M6 12v5c3 3 9 3 12 0v-5"/>
+              </svg>
+              Early Career
+            </span>
+          </button>
+
+          <button type="submit" class="track-btn executive" data-track="executive">
+            <span class="btn-pulse"></span>
+            <span class="btn-label">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 2l3 7h7l-5.5 4.5L18 21l-6-4-6 4 1.5-7.5L2 9h7z"/>
+              </svg>
+              Executive
+            </span>
+          </button>
+        </div>
+      </form>
+
+      <!-- Results -->
+      <div id="results" class="results" aria-live="polite"></div>
+    </section>
+
+    <footer class="footer">
+      <span>Crafted with care · Foxtrot HR</span>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>

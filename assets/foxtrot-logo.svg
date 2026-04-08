@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="foxBody" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffcf40"/>
+      <stop offset="45%" stop-color="#ff6b35"/>
+      <stop offset="100%" stop-color="#ff2d87"/>
+    </linearGradient>
+    <linearGradient id="foxInner" x1="0" y1="0" x2="0" y2="64" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fff6e6"/>
+      <stop offset="100%" stop-color="#ffd9b3"/>
+    </linearGradient>
+    <radialGradient id="foxGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="#ffcf40" stop-opacity="0.55"/>
+      <stop offset="100%" stop-color="#ff2d87" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- soft glow behind -->
+  <circle cx="32" cy="32" r="30" fill="url(#foxGlow)"/>
+
+  <!-- Fox head: geometric, modern -->
+  <!-- Left ear -->
+  <path d="M10 14 L22 10 L24 26 Z" fill="url(#foxBody)"/>
+  <path d="M14 16 L21 14 L22 22 Z" fill="#140029" opacity="0.85"/>
+
+  <!-- Right ear -->
+  <path d="M54 14 L42 10 L40 26 Z" fill="url(#foxBody)"/>
+  <path d="M50 16 L43 14 L42 22 Z" fill="#140029" opacity="0.85"/>
+
+  <!-- Head main shape -->
+  <path d="M32 12
+           L48 18
+           L52 36
+           Q52 50 32 56
+           Q12 50 12 36
+           L16 18 Z"
+        fill="url(#foxBody)"/>
+
+  <!-- Inner face (muzzle + cheeks) -->
+  <path d="M32 26
+           L44 30
+           L40 46
+           Q32 52 24 46
+           L20 30 Z"
+        fill="url(#foxInner)"/>
+
+  <!-- Eyes -->
+  <ellipse cx="24" cy="32" rx="2.4" ry="3" fill="#140029"/>
+  <ellipse cx="40" cy="32" rx="2.4" ry="3" fill="#140029"/>
+  <circle cx="24.8" cy="31.2" r="0.8" fill="#fff"/>
+  <circle cx="40.8" cy="31.2" r="0.8" fill="#fff"/>
+
+  <!-- Nose -->
+  <path d="M32 40 L29 43.5 L32 45.5 L35 43.5 Z" fill="#140029"/>
+
+  <!-- Mouth -->
+  <path d="M32 45.5 L32 48 M32 48 Q29 50 27 48 M32 48 Q35 50 37 48"
+        stroke="#140029" stroke-width="1.4" stroke-linecap="round" fill="none"/>
+</svg>
