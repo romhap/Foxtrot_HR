@@ -384,17 +384,51 @@ async function callOpenAI(apiKey, userPrompt) {
 /* ---------- Error formatting ---------- */
 
 function friendlyError(err) {
-  const msg = err?.message || 'Something went wrong.';
-  if (/401|authentication|invalid.*key|incorrect api key/i.test(msg)) {
+  // Try to dig out the most useful structured info the SDKs provide.
+  const status = err?.status ?? err?.response?.status;
+  const code = err?.code ?? err?.error?.code;
+  const type = err?.type ?? err?.error?.type;
+  const apiMsg = err?.error?.message || err?.message || 'Something went wrong.';
+
+  // Insufficient quota — OpenAI returns 429 for this, but it is NOT
+  // retryable: the user needs to add billing / credits.
+  if (
+    code === 'insufficient_quota' ||
+    type === 'insufficient_quota' ||
+    /insufficient[_\s]quota|exceeded your current quota|billing/i.test(apiMsg)
+  ) {
+    return 'Your OpenAI account has no available quota. Add billing or credits at platform.openai.com/account/billing, then try again.';
+  }
+
+  // Model not found / not accessible to this account.
+  if (
+    status === 404 ||
+    code === 'model_not_found' ||
+    /model.*(not found|does not exist|not available)/i.test(apiMsg)
+  ) {
+    return `Model not available to this key: ${apiMsg}`;
+  }
+
+  // Actual rate limit (retryable).
+  if (status === 429 || /rate[_\s]?limit/i.test(apiMsg)) {
+    return `Rate limited. ${apiMsg}`;
+  }
+
+  // Auth.
+  if (
+    status === 401 ||
+    /401|authentication|invalid.*api.*key|incorrect api key/i.test(apiMsg)
+  ) {
     return 'Invalid API key. Click the gear icon to update it.';
   }
-  if (/429|rate.?limit/i.test(msg)) {
-    return 'Rate limited. Try again in a moment.';
-  }
-  if (/cors|network|failed to fetch/i.test(msg)) {
+
+  // Network.
+  if (/cors|network|failed to fetch|load failed/i.test(apiMsg)) {
     return 'Network error reaching the model. Check your connection and key.';
   }
-  return msg;
+
+  // Anything else — show the real message so the cause is visible.
+  return apiMsg;
 }
 
 /* ---------- UI rendering ---------- */
