@@ -29,6 +29,13 @@
         <h1 class="brand-name">FOXTROT<span class="brand-dot">.</span></h1>
         <p class="brand-tag">Recruiter Finder</p>
       </div>
+      <button type="button" id="settings-btn" class="settings-btn" aria-label="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09a1.65 1.65 0 001.51-1 1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06a1.65 1.65 0 001.82.33h0a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51h0a1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82v0a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+        </svg>
+        <span class="settings-dot" aria-hidden="true"></span>
+      </button>
     </header>
 
     <!-- Main card -->
@@ -88,6 +95,45 @@
     </footer>
   </main>
 
-  <script src="script.js"></script>
+  <!-- Settings modal: Anthropic API key -->
+  <div id="settings-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="settings-title">
+    <div id="settings-backdrop" class="modal-backdrop"></div>
+    <div class="modal-card" role="document">
+      <button type="button" id="settings-close" class="modal-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6L6 18M6 6l12 12"/>
+        </svg>
+      </button>
+      <h3 id="settings-title" class="modal-title">Anthropic API Key</h3>
+      <p class="modal-sub">
+        Foxtrot calls Claude directly from your browser. Paste your key below — it stays in
+        <code>localStorage</code> and is never sent anywhere except Anthropic.
+      </p>
+      <form id="settings-form" class="modal-form" autocomplete="off">
+        <label for="api-key-input" class="modal-label">API Key</label>
+        <input
+          id="api-key-input"
+          type="password"
+          class="modal-input"
+          placeholder="sk-ant-..."
+          spellcheck="false"
+          autocomplete="off"
+        />
+        <div class="modal-actions">
+          <button type="button" id="settings-clear" class="modal-btn ghost">Clear</button>
+          <button type="submit" class="modal-btn primary">Save key</button>
+        </div>
+        <div id="settings-status" class="modal-status" aria-live="polite"></div>
+        <p class="modal-hint">
+          Get a key at
+          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
+            console.anthropic.com
+          </a>.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="script.js"></script>
 </body>
 </html>

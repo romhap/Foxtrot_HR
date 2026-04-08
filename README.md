@@ -5,31 +5,23 @@ should message on LinkedIn for any company. Type a company, pick a track
 (Early Career or Executive), and Foxtrot returns a single contact card with
 a name, title, direct LinkedIn link, reasoning, and confidence level.
 
-Under the hood it uses the Claude API with web search to identify a real,
-currently-employed person — no manual LinkedIn hunting required.
+Under the hood it calls the Claude API (with web search) directly from your
+browser — no backend to host, no server to keep running.
 
-## Setup
+## Use it (static)
 
-```bash
-npm install
-cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY
-```
-
-## Run
-
-```bash
-npm start
-# → http://localhost:3000
-```
-
-Then open the URL, type a company, and hit **Early Career** (green) or
-**Executive** (red).
+1. Open `index.html` in any browser, or serve the folder with any static
+   file server (e.g. `python3 -m http.server`, Vercel, GitHub Pages, etc.).
+2. Click the **gear icon** in the top-right and paste your Anthropic API key.
+   Get one at [console.anthropic.com](https://console.anthropic.com/settings/keys).
+   The key is stored only in your browser's `localStorage` and is sent only
+   to `api.anthropic.com`.
+3. Type a company, pick **Early Career** (green) or **Executive** (red).
 
 ## How it works
 
-- `server.js` exposes `POST /api/find-recruiter` with `{company, track}`.
-- It calls `claude-opus-4-6` with:
+- `script.js` imports the `@anthropic-ai/sdk` from `esm.sh` and calls
+  `claude-opus-4-6` directly from the browser with:
   - Adaptive thinking (`thinking: {type: 'adaptive'}`)
   - High effort (`output_config.effort: 'high'`)
   - Web search (`web_search_20260209`, up to 6 uses)
@@ -42,8 +34,20 @@ Then open the URL, type a company, and hit **Early Career** (green) or
 
 | File | Purpose |
 |---|---|
-| `server.js` | Express backend + Claude API integration |
-| `index.html` | Markup |
+| `index.html` | Markup + API-key modal |
 | `styles.css` | Glassmorphic, animated UI |
-| `script.js` | Calls the backend, renders the contact card |
+| `script.js` | Calls Claude directly, renders the contact card |
 | `assets/foxtrot-logo.svg` | Brand mark |
+| `server.js` | Optional — a legacy Express proxy if you'd rather not expose the key in the browser |
+
+## Optional: run with a proxy server
+
+If you don't want the API key to live in the browser, you can run the
+included `server.js`, which proxies the Claude call server-side. In that
+mode you'd edit `script.js` to POST to `/api/find-recruiter` instead of
+calling the SDK directly.
+
+```bash
+npm install
+ANTHROPIC_API_KEY=sk-ant-... npm start
+```
