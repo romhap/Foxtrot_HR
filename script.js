@@ -1,14 +1,43 @@
 /* ============================================================
    Foxtrot HR — Recruiter Finder (frontend)
-   Calls the Anthropic API directly from the browser using the
-   user's own API key (stored in localStorage). Claude's
-   built-in web_search tool does the actual research.
+   Calls Anthropic OR OpenAI directly from the browser using
+   the user's own API key (stored in localStorage). Both models
+   use their built-in web_search tool to do the research.
    ============================================================ */
 
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.40.0';
+import OpenAI from 'https://esm.sh/openai@4.77.0';
 
-const STORAGE_KEY = 'foxtrot_hr_api_key';
+/* ---------- Storage keys ---------- */
+const STORAGE = {
+  provider: 'foxtrot_hr_provider',
+  anthropic: 'foxtrot_hr_key_anthropic',
+  openai: 'foxtrot_hr_key_openai',
+};
 
+/* ---------- Provider registry ---------- */
+const PROVIDERS = {
+  anthropic: {
+    label: 'Anthropic',
+    model: 'Claude Opus 4.6',
+    placeholder: 'sk-ant-...',
+    prefix: 'sk-ant-',
+    prefixHint: 'should start with sk-ant-',
+    keyUrl: 'https://console.anthropic.com/settings/keys',
+    keyUrlLabel: 'console.anthropic.com',
+  },
+  openai: {
+    label: 'OpenAI',
+    model: 'GPT-5',
+    placeholder: 'sk-... or sk-proj-...',
+    prefix: 'sk-',
+    prefixHint: 'should start with sk- (and not sk-ant-)',
+    keyUrl: 'https://platform.openai.com/api-keys',
+    keyUrlLabel: 'platform.openai.com',
+  },
+};
+
+/* ---------- DOM refs ---------- */
 const form = document.getElementById('search-form');
 const companyInput = document.getElementById('company');
 const resultsEl = document.getElementById('results');
@@ -20,18 +49,22 @@ const settingsBackdrop = document.getElementById('settings-backdrop');
 const settingsClose = document.getElementById('settings-close');
 const settingsForm = document.getElementById('settings-form');
 const apiKeyInput = document.getElementById('api-key-input');
+const apiKeyLabel = document.getElementById('api-key-label');
 const settingsClear = document.getElementById('settings-clear');
 const settingsStatus = document.getElementById('settings-status');
+const providerPills = document.querySelectorAll('.provider-pill');
+const settingsKeyLink = document.getElementById('settings-key-link');
 
 let pendingTrack = 'early';
 let inFlight = false;
+let activeProvider = getProvider();
 
 const TRACK_META = {
   early: { label: 'Early Career', chipClass: 'early' },
   executive: { label: 'Executive', chipClass: 'executive' },
 };
 
-/* ---------- Claude config (mirrors the old server.js) ---------- */
+/* ---------- Shared prompt + schema ---------- */
 
 const RESULT_SCHEMA = {
   type: 'object',
@@ -92,26 +125,66 @@ Rules:
 5. Be honest about confidence. If you're guessing, say low.
 6. Never invent names. If no suitable person can be found, return the closest verified fit with confidence "low" and explain in the reasoning.`;
 
-/* ---------- API key management ---------- */
+function buildUserPrompt(company, track) {
+  const brief = TRACK_BRIEFS[track];
+  const cleanCompany = company.trim().slice(0, 120);
+  return {
+    cleanCompany,
+    prompt: `Company: ${cleanCompany}
+Track: ${brief.label} — ${brief.description}
+Ideal titles to look for: ${brief.target_titles}
 
-function getApiKey() {
-  return localStorage.getItem(STORAGE_KEY) || '';
+Find the SINGLE best HR / recruiting person currently at ${cleanCompany} who I should message on LinkedIn about a ${brief.label.toLowerCase()} job. I will contact this person directly, so accuracy matters more than breadth. Return exactly one person in the required JSON shape.`,
+  };
 }
 
-function setApiKey(key) {
-  if (key) localStorage.setItem(STORAGE_KEY, key);
-  else localStorage.removeItem(STORAGE_KEY);
+/* ---------- Provider / key storage ---------- */
+
+function getProvider() {
+  const p = localStorage.getItem(STORAGE.provider);
+  return p === 'openai' ? 'openai' : 'anthropic';
+}
+
+function setProvider(p) {
+  localStorage.setItem(STORAGE.provider, p);
+  activeProvider = p;
+  updateSettingsIndicator();
+}
+
+function getKey(provider) {
+  return localStorage.getItem(STORAGE[provider]) || '';
+}
+
+function setKey(provider, key) {
+  if (key) localStorage.setItem(STORAGE[provider], key);
+  else localStorage.removeItem(STORAGE[provider]);
   updateSettingsIndicator();
 }
 
 function updateSettingsIndicator() {
   if (!settingsBtn) return;
-  settingsBtn.classList.toggle('has-key', !!getApiKey());
+  settingsBtn.classList.toggle('has-key', !!getKey(activeProvider));
+}
+
+/* ---------- Settings modal ---------- */
+
+function applyProviderToModal(provider) {
+  const meta = PROVIDERS[provider];
+  apiKeyLabel.textContent = `${meta.label} API Key`;
+  apiKeyInput.placeholder = meta.placeholder;
+  apiKeyInput.value = getKey(provider);
+  settingsKeyLink.href = meta.keyUrl;
+  settingsKeyLink.textContent = meta.keyUrlLabel;
+  providerPills.forEach((p) => {
+    const isActive = p.dataset.provider === provider;
+    p.classList.toggle('is-active', isActive);
+    p.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+  settingsStatus.textContent = '';
 }
 
 function openSettings() {
-  apiKeyInput.value = getApiKey();
-  settingsStatus.textContent = '';
+  applyProviderToModal(activeProvider);
   settingsModal.classList.add('is-open');
   settingsModal.setAttribute('aria-hidden', 'false');
   setTimeout(() => apiKeyInput.focus(), 60);
@@ -132,26 +205,40 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+providerPills.forEach((pill) => {
+  pill.addEventListener('click', () => {
+    const p = pill.dataset.provider;
+    if (!PROVIDERS[p]) return;
+    setProvider(p);
+    applyProviderToModal(p);
+  });
+});
+
 settingsForm?.addEventListener('submit', (e) => {
   e.preventDefault();
   const val = apiKeyInput.value.trim();
+  const meta = PROVIDERS[activeProvider];
   if (!val) {
-    settingsStatus.textContent = 'Please paste a key or click "Clear" to remove.';
+    settingsStatus.textContent = 'Paste a key or click "Clear" to remove.';
     return;
   }
-  if (!val.startsWith('sk-ant-')) {
-    settingsStatus.textContent = 'That doesn\'t look like an Anthropic key (should start with sk-ant-).';
+  if (activeProvider === 'anthropic' && !val.startsWith('sk-ant-')) {
+    settingsStatus.textContent = `That doesn't look like an Anthropic key (${meta.prefixHint}).`;
     return;
   }
-  setApiKey(val);
-  settingsStatus.textContent = 'Saved. Your key lives only in this browser.';
+  if (activeProvider === 'openai' && (!val.startsWith('sk-') || val.startsWith('sk-ant-'))) {
+    settingsStatus.textContent = `That doesn't look like an OpenAI key (${meta.prefixHint}).`;
+    return;
+  }
+  setKey(activeProvider, val);
+  settingsStatus.textContent = `Saved. Your ${meta.label} key lives only in this browser.`;
   setTimeout(closeSettings, 700);
 });
 
 settingsClear?.addEventListener('click', () => {
-  setApiKey('');
+  setKey(activeProvider, '');
   apiKeyInput.value = '';
-  settingsStatus.textContent = 'Cleared.';
+  settingsStatus.textContent = `Cleared ${PROVIDERS[activeProvider].label} key.`;
 });
 
 updateSettingsIndicator();
@@ -174,9 +261,9 @@ form.addEventListener('submit', async (e) => {
     return;
   }
 
-  const apiKey = getApiKey();
+  const apiKey = getKey(activeProvider);
   if (!apiKey) {
-    renderError('Add your Anthropic API key first (gear icon, top right).');
+    renderError(`Add your ${PROVIDERS[activeProvider].label} API key first (gear icon, top right).`);
     openSettings();
     return;
   }
@@ -186,7 +273,7 @@ form.addEventListener('submit', async (e) => {
   setFormDisabled(true);
 
   try {
-    const data = await findRecruiter(apiKey, company, pendingTrack);
+    const data = await findRecruiter(activeProvider, apiKey, company, pendingTrack);
     renderPerson(data);
   } catch (err) {
     renderError(friendlyError(err));
@@ -196,23 +283,26 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-/* ---------- Claude call (browser-side) ---------- */
+/* ---------- findRecruiter dispatch ---------- */
 
-async function findRecruiter(apiKey, company, track) {
+async function findRecruiter(provider, apiKey, company, track) {
   const brief = TRACK_BRIEFS[track];
   if (!brief) throw new Error('Track must be "early" or "executive".');
 
-  const cleanCompany = company.trim().slice(0, 120);
-  const userPrompt = `Company: ${cleanCompany}
-Track: ${brief.label} — ${brief.description}
-Ideal titles to look for: ${brief.target_titles}
+  const { cleanCompany, prompt } = buildUserPrompt(company, track);
 
-Find the SINGLE best HR / recruiting person currently at ${cleanCompany} who I should message on LinkedIn about a ${brief.label.toLowerCase()} job. I will contact this person directly, so accuracy matters more than breadth. Return exactly one person in the required JSON shape.`;
+  const data =
+    provider === 'openai'
+      ? await callOpenAI(apiKey, prompt)
+      : await callAnthropic(apiKey, prompt);
 
-  const client = new Anthropic({
-    apiKey,
-    dangerouslyAllowBrowser: true,
-  });
+  return { company: cleanCompany, track, ...data };
+}
+
+/* ---------- Anthropic ---------- */
+
+async function callAnthropic(apiKey, userPrompt) {
+  const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
 
   const message = await client.messages.create({
     model: 'claude-opus-4-6',
@@ -236,26 +326,67 @@ Find the SINGLE best HR / recruiting person currently at ${cleanCompany} who I s
   const textBlock = message.content.find((b) => b.type === 'text');
   if (!textBlock) throw new Error('Model returned no text output.');
 
-  let data;
   try {
-    data = JSON.parse(textBlock.text);
+    return JSON.parse(textBlock.text);
   } catch {
     throw new Error('Model output was not valid JSON.');
   }
-
-  return { company: cleanCompany, track, ...data };
 }
+
+/* ---------- OpenAI (Responses API + web_search + json_schema) ---------- */
+
+async function callOpenAI(apiKey, userPrompt) {
+  const client = new OpenAI({ apiKey, dangerouslyAllowBrowser: true });
+
+  const response = await client.responses.create({
+    model: 'gpt-5',
+    instructions: SYSTEM_PROMPT,
+    input: userPrompt,
+    tools: [{ type: 'web_search' }],
+    text: {
+      format: {
+        type: 'json_schema',
+        name: 'recruiter',
+        strict: true,
+        schema: RESULT_SCHEMA,
+      },
+    },
+  });
+
+  // Prefer the SDK's output_text helper; fall back to traversing output blocks.
+  let text = response.output_text;
+  if (!text && Array.isArray(response.output)) {
+    for (const item of response.output) {
+      if (item.type === 'message' && Array.isArray(item.content)) {
+        for (const c of item.content) {
+          if (c.type === 'output_text' && typeof c.text === 'string') {
+            text = (text || '') + c.text;
+          }
+        }
+      }
+    }
+  }
+  if (!text) throw new Error('Model returned no text output.');
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Model output was not valid JSON.');
+  }
+}
+
+/* ---------- Error formatting ---------- */
 
 function friendlyError(err) {
   const msg = err?.message || 'Something went wrong.';
-  if (/401|authentication|invalid.*key/i.test(msg)) {
+  if (/401|authentication|invalid.*key|incorrect api key/i.test(msg)) {
     return 'Invalid API key. Click the gear icon to update it.';
   }
   if (/429|rate.?limit/i.test(msg)) {
-    return 'Rate limited by Anthropic. Try again in a moment.';
+    return 'Rate limited. Try again in a moment.';
   }
   if (/cors|network|failed to fetch/i.test(msg)) {
-    return 'Network error reaching Anthropic. Check your connection and key.';
+    return 'Network error reaching the model. Check your connection and key.';
   }
   return msg;
 }
@@ -272,6 +403,7 @@ function setFormDisabled(disabled) {
 
 function setLoading(company, track) {
   const meta = TRACK_META[track];
+  const provMeta = PROVIDERS[activeProvider];
   resultsEl.innerHTML = `
     <div class="result-header">
       <span>Searching for</span>
@@ -290,7 +422,7 @@ function setLoading(company, track) {
       <span class="dot"></span>
       <span class="dot"></span>
       <span class="dot"></span>
-      <span class="loading-text">Foxtrot is researching the web for the perfect contact…</span>
+      <span class="loading-text">${escapeHTML(provMeta.model)} is researching the web for the perfect contact…</span>
     </div>
   `;
   resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });

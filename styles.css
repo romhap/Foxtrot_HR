@@ -869,6 +869,77 @@ body {
   color: #ffd98a;
 }
 
+/* Provider pills (Anthropic / OpenAI toggle) */
+.provider-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 6px 0 18px 0;
+}
+
+.provider-pill {
+  position: relative;
+  padding: 12px 14px 12px 36px;
+  text-align: left;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.provider-pill:hover {
+  border-color: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.provider-pill .pill-sub {
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.provider-pill .pill-dot {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+.provider-pill .pill-dot.anthropic {
+  background: linear-gradient(135deg, #ff7a59, #ffcf40);
+}
+.provider-pill .pill-dot.openai {
+  background: linear-gradient(135deg, #00d1b2, #6e57ff);
+}
+
+.provider-pill.is-active {
+  border-color: rgba(255, 207, 64, 0.55);
+  background: linear-gradient(135deg, rgba(255, 107, 53, 0.14), rgba(255, 45, 135, 0.1));
+  box-shadow: 0 10px 26px rgba(255, 45, 135, 0.22);
+}
+.provider-pill.is-active .pill-dot {
+  border-color: #fff;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12), 0 0 12px currentColor;
+}
+.provider-pill.is-active .pill-sub {
+  color: var(--ink-dim);
+}
+
 .modal-form {
   display: flex;
   flex-direction: column;

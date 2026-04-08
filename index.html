@@ -95,7 +95,7 @@
     </footer>
   </main>
 
-  <!-- Settings modal: Anthropic API key -->
+  <!-- Settings modal: provider + API key -->
   <div id="settings-modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="settings-title">
     <div id="settings-backdrop" class="modal-backdrop"></div>
     <div class="modal-card" role="document">
@@ -104,18 +104,32 @@
           <path d="M18 6L6 18M6 6l12 12"/>
         </svg>
       </button>
-      <h3 id="settings-title" class="modal-title">Anthropic API Key</h3>
+      <h3 id="settings-title" class="modal-title">Model &amp; API Key</h3>
       <p class="modal-sub">
-        Foxtrot calls Claude directly from your browser. Paste your key below — it stays in
-        <code>localStorage</code> and is never sent anywhere except Anthropic.
+        Foxtrot calls the model directly from your browser. Keys stay in
+        <code>localStorage</code> and are only sent to the provider you pick.
       </p>
+
+      <div class="provider-row" role="group" aria-label="Provider">
+        <button type="button" class="provider-pill" data-provider="anthropic" aria-pressed="false">
+          <span class="pill-dot anthropic"></span>
+          Anthropic
+          <span class="pill-sub">Claude Opus 4.6</span>
+        </button>
+        <button type="button" class="provider-pill" data-provider="openai" aria-pressed="false">
+          <span class="pill-dot openai"></span>
+          OpenAI
+          <span class="pill-sub">GPT-5</span>
+        </button>
+      </div>
+
       <form id="settings-form" class="modal-form" autocomplete="off">
-        <label for="api-key-input" class="modal-label">API Key</label>
+        <label id="api-key-label" for="api-key-input" class="modal-label">API Key</label>
         <input
           id="api-key-input"
           type="password"
           class="modal-input"
-          placeholder="sk-ant-..."
+          placeholder="sk-..."
           spellcheck="false"
           autocomplete="off"
         />
@@ -126,7 +140,7 @@
         <div id="settings-status" class="modal-status" aria-live="polite"></div>
         <p class="modal-hint">
           Get a key at
-          <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
+          <a id="settings-key-link" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">
             console.anthropic.com
           </a>.
         </p>
