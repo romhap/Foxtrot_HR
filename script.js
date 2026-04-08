@@ -7,12 +7,14 @@
 
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.40.0';
 import OpenAI from 'https://esm.sh/openai@5';
+import { GoogleGenAI } from 'https://esm.sh/@google/genai@1';
 
 /* ---------- Storage keys ---------- */
 const STORAGE = {
   provider: 'foxtrot_hr_provider',
   anthropic: 'foxtrot_hr_key_anthropic',
   openai: 'foxtrot_hr_key_openai',
+  gemini: 'foxtrot_hr_key_gemini',
 };
 
 /* ---------- Provider registry ---------- */
@@ -21,7 +23,6 @@ const PROVIDERS = {
     label: 'Anthropic',
     model: 'Claude Opus 4.6',
     placeholder: 'sk-ant-...',
-    prefix: 'sk-ant-',
     prefixHint: 'should start with sk-ant-',
     keyUrl: 'https://console.anthropic.com/settings/keys',
     keyUrlLabel: 'console.anthropic.com',
@@ -30,10 +31,17 @@ const PROVIDERS = {
     label: 'OpenAI',
     model: 'GPT-5',
     placeholder: 'sk-... or sk-proj-...',
-    prefix: 'sk-',
     prefixHint: 'should start with sk- (and not sk-ant-)',
     keyUrl: 'https://platform.openai.com/api-keys',
     keyUrlLabel: 'platform.openai.com',
+  },
+  gemini: {
+    label: 'Gemini',
+    model: 'Gemini 2.5 Pro',
+    placeholder: 'AIza...',
+    prefixHint: 'should start with AIza',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    keyUrlLabel: 'aistudio.google.com',
   },
 };
 
@@ -142,7 +150,7 @@ Find the SINGLE best HR / recruiting person currently at ${cleanCompany} who I s
 
 function getProvider() {
   const p = localStorage.getItem(STORAGE.provider);
-  return p === 'openai' ? 'openai' : 'anthropic';
+  return PROVIDERS[p] ? p : 'anthropic';
 }
 
 function setProvider(p) {
@@ -230,6 +238,10 @@ settingsForm?.addEventListener('submit', (e) => {
     settingsStatus.textContent = `That doesn't look like an OpenAI key (${meta.prefixHint}).`;
     return;
   }
+  if (activeProvider === 'gemini' && !val.startsWith('AIza')) {
+    settingsStatus.textContent = `That doesn't look like a Gemini key (${meta.prefixHint}).`;
+    return;
+  }
   setKey(activeProvider, val);
   settingsStatus.textContent = `Saved. Your ${meta.label} key lives only in this browser.`;
   setTimeout(closeSettings, 700);
@@ -291,10 +303,10 @@ async function findRecruiter(provider, apiKey, company, track) {
 
   const { cleanCompany, prompt } = buildUserPrompt(company, track);
 
-  const data =
-    provider === 'openai'
-      ? await callOpenAI(apiKey, prompt)
-      : await callAnthropic(apiKey, prompt);
+  let data;
+  if (provider === 'openai') data = await callOpenAI(apiKey, prompt);
+  else if (provider === 'gemini') data = await callGemini(apiKey, prompt);
+  else data = await callAnthropic(apiKey, prompt);
 
   return { company: cleanCompany, track, ...data };
 }
@@ -379,6 +391,99 @@ async function callOpenAI(apiKey, userPrompt) {
   } catch {
     throw new Error('Model output was not valid JSON.');
   }
+}
+
+/* ---------- Gemini (googleSearch grounding + prompted JSON) ----------
+   Gemini's API does not allow googleSearch grounding and responseSchema
+   in the same call, so we use grounding and ask the model to emit JSON
+   via the prompt, then parse robustly. */
+
+const GEMINI_JSON_INSTRUCTION = `
+
+Return your answer as a SINGLE JSON object with exactly these fields and nothing else:
+{
+  "name": "<full name>",
+  "title": "<current job title at the target company>",
+  "linkedin_url": "<direct https://www.linkedin.com/in/<slug> URL, or a LinkedIn people-search URL scoped to the person's name + company>",
+  "reasoning": "<1-2 sentence explanation>",
+  "confidence": "high" | "medium" | "low"
+}
+
+Do not wrap the JSON in markdown fences. Do not include any text before or after the JSON. Return only the JSON object.`;
+
+async function callGemini(apiKey, userPrompt) {
+  const ai = new GoogleGenAI({ apiKey });
+
+  if (!ai?.models || typeof ai.models.generateContent !== 'function') {
+    throw new Error(
+      'Gemini SDK is missing models.generateContent. Hard-refresh the page to pull the latest bundle.'
+    );
+  }
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-2.5-pro',
+    contents: userPrompt + GEMINI_JSON_INSTRUCTION,
+    config: {
+      systemInstruction: SYSTEM_PROMPT,
+      tools: [{ googleSearch: {} }],
+    },
+  });
+
+  // Newer SDK exposes response.text as a getter; older returns a function.
+  let text =
+    typeof response?.text === 'function'
+      ? response.text()
+      : response?.text;
+
+  // Fall back to walking candidates if .text is missing.
+  if (!text && Array.isArray(response?.candidates)) {
+    const parts = response.candidates[0]?.content?.parts || [];
+    text = parts.map((p) => p?.text || '').join('');
+  }
+
+  if (!text) throw new Error('Gemini returned no text output.');
+
+  return parseLooseJSON(text);
+}
+
+/** Parse JSON that may be wrapped in markdown fences or mixed with prose. */
+function parseLooseJSON(text) {
+  const trimmed = String(text).trim();
+
+  // 1) Strip ```json ... ``` fences if present.
+  let cleaned = trimmed
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/, '')
+    .trim();
+
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    /* fall through */
+  }
+
+  // 2) Extract the first balanced { ... } object from the text.
+  const start = cleaned.indexOf('{');
+  if (start !== -1) {
+    let depth = 0;
+    for (let i = start; i < cleaned.length; i++) {
+      const ch = cleaned[i];
+      if (ch === '{') depth++;
+      else if (ch === '}') {
+        depth--;
+        if (depth === 0) {
+          const candidate = cleaned.slice(start, i + 1);
+          try {
+            return JSON.parse(candidate);
+          } catch {
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  throw new Error('Model output was not valid JSON.');
 }
 
 /* ---------- Error formatting ---------- */

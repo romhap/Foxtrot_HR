@@ -869,20 +869,20 @@ body {
   color: #ffd98a;
 }
 
-/* Provider pills (Anthropic / OpenAI toggle) */
+/* Provider pills (Anthropic / OpenAI / Gemini toggle) */
 .provider-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
   margin: 6px 0 18px 0;
 }
 
 .provider-pill {
   position: relative;
-  padding: 12px 14px 12px 36px;
+  padding: 12px 12px 12px 28px;
   text-align: left;
   font-family: 'Space Grotesk', sans-serif;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--ink);
@@ -912,10 +912,10 @@ body {
 .provider-pill .pill-dot {
   position: absolute;
   top: 50%;
-  left: 14px;
+  left: 10px;
   transform: translateY(-50%);
-  width: 12px;
-  height: 12px;
+  width: 11px;
+  height: 11px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.3);
   transition: box-shadow 0.25s ease, border-color 0.25s ease, background 0.25s ease;
@@ -925,6 +925,9 @@ body {
 }
 .provider-pill .pill-dot.openai {
   background: linear-gradient(135deg, #00d1b2, #6e57ff);
+}
+.provider-pill .pill-dot.gemini {
+  background: linear-gradient(135deg, #4285f4, #9b72ff 55%, #ff5ea0);
 }
 
 .provider-pill.is-active {
@@ -1045,4 +1048,7 @@ body {
   .avatar-initials { font-size: 22px; }
   .settings-btn { width: 40px; height: 40px; border-radius: 12px; }
   .modal-card { padding: 28px 22px 22px; }
+  .provider-row { grid-template-columns: 1fr; }
+  .provider-pill { padding: 10px 12px 10px 32px; }
+  .provider-pill .pill-dot { left: 12px; }
 }
